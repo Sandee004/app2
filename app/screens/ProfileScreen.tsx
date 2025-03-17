@@ -28,7 +28,6 @@ export default function ProfileScreen() {
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    // Load user data from storage
     const loadUserData = async () => {
       try {
         const storedUser = await AsyncStorage.getItem("user");
@@ -137,6 +136,11 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleLogout = async () => {
+    await AsyncStorage.removeItem("user");
+    await AsyncStorage.removeItem("token");
+    setUser(null);
+  };
   const [profilePic, setProfilePic] = useState<string | null>(
     user?.profile_picture || null
   );
@@ -309,7 +313,12 @@ export default function ProfileScreen() {
               setUser(null);
             }}
           >
-            <Text style={tw`text-white text-lg text-center`}>Log Out</Text>
+            <Text
+              style={tw`text-white text-lg text-center`}
+              onPress={handleLogout}
+            >
+              Log Out
+            </Text>
           </TouchableOpacity>
         </>
       ) : (

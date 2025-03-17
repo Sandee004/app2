@@ -5,6 +5,7 @@ import {
   SafeAreaView,
   FlatList,
   ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 import tw from "twrnc";
 import SingleMovieScreen from "./singleMovieScreen";
@@ -19,6 +20,7 @@ interface Movie {
 
 interface ApiResponse {
   results: Movie[];
+  total_pages: number;
 }
 
 const apiKey = "ceba03f56c18f997a242eb118d552605";
@@ -27,30 +29,56 @@ const apiUrl = `https://api.themoviedb.org/3/discover/movie?api_key=${apiKey}&wi
 export default function MainScreen() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const fetchMovies = async (pageNumber: number) => {
+    if (pageNumber > totalPages) return;
+
+    try {
+      if (pageNumber === 1) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
+      }
+
+      const response = await fetch(`${apiUrl}&page=${pageNumber}`);
+      const data = (await response.json()) as ApiResponse;
+
+      const moviesWithNumberId = data.results
+        .map((movie) => ({
+          ...movie,
+          id: Number(movie.id),
+        }))
+        .filter((movie) => movie.title !== "Le Clitoris");
+
+      setMovies((prevMovies) =>
+        pageNumber === 1
+          ? moviesWithNumberId
+          : [...prevMovies, ...moviesWithNumberId]
+      );
+
+      setTotalPages(data.total_pages);
+    } catch (error) {
+      console.error("Error fetching movies:", error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchMovies = async () => {
-      try {
-        const response = await fetch(apiUrl);
-        const data = await response.json();
-
-        const moviesWithNumberId = (data as ApiResponse).results
-          .map((movie: Movie) => ({
-            ...movie,
-            id: Number(movie.id),
-          }))
-          .filter((movie: Movie) => movie.title !== "Le Clitoris"); // Exclude by title
-
-        setMovies(moviesWithNumberId);
-      } catch (error) {
-        console.error("Error fetching movies:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMovies();
+    fetchMovies(1);
   }, []);
+
+  const loadMore = () => {
+    if (page < totalPages) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      fetchMovies(nextPage);
+    }
+  };
 
   return (
     <SafeAreaView style={tw`flex-1`}>
@@ -60,10 +88,25 @@ export default function MainScreen() {
         ) : (
           <FlatList
             data={movies}
-            keyExtractor={(item: { id: number }) => item.id.toString()}
+            keyExtractor={(item) => item.id.toString()}
             renderItem={({ item }) => <SingleMovieScreen movie={item} />}
             numColumns={2}
-            contentContainerStyle={tw`pb-20`}
+            contentContainerStyle={tw`pb-20 items-center`}
+            columnWrapperStyle={tw`justify-between`}
+            ListFooterComponent={
+              loadingMore ? (
+                <ActivityIndicator size="small" color="#C8A2C8" />
+              ) : page < totalPages ? (
+                <TouchableOpacity
+                  onPress={loadMore}
+                  style={tw`bg-[#373b69] py-3 px-6 rounded-lg mt-4`}
+                >
+                  <Text style={tw`text-white font-bold text-center`}>
+                    See More
+                  </Text>
+                </TouchableOpacity>
+              ) : null
+            }
           />
         )}
       </View>

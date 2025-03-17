@@ -1,5 +1,12 @@
 import React, { useState, useCallback } from "react";
-import { Text, View, Image, FlatList, Alert, ActivityIndicator } from "react-native";
+import {
+  Text,
+  View,
+  Image,
+  FlatList,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
 import tw from "twrnc";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
@@ -16,6 +23,7 @@ const TMDB_API_KEY = "ceba03f56c18f997a242eb118d552605";
 export default function FavoriteScreen() {
   const [favorites, setFavorites] = useState<Movie[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loggedIn, setLoggedIn] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -26,11 +34,25 @@ export default function FavoriteScreen() {
   const fetchFavorites = async () => {
     setLoading(true);
     try {
+      const isUserLoggedIn = await AsyncStorage.getItem("loggedIn");
+      if (isUserLoggedIn !== "true") {
+        Alert.alert("Error", "Please login to see favorites");
+        setFavorites([]);
+        setLoggedIn(false);
+        setLoading(false);
+        return;
+      }
+
       const token = await AsyncStorage.getItem("token");
       if (!token) {
         Alert.alert("Error", "Please login to see favorites");
+        setFavorites([]);
+        setLoggedIn(false);
+        setLoading(false);
         return;
       }
+
+      setLoggedIn(true);
 
       const response = await fetch(
         "https://app-backend-2l6q.onrender.com/api/favorites",
@@ -60,10 +82,12 @@ export default function FavoriteScreen() {
         setFavorites(moviesWithDetails);
       } else {
         Alert.alert("Error", data.error || "Failed to fetch favorites");
+        setFavorites([]);
       }
     } catch (error) {
       console.error("Error fetching favorites:", error);
       Alert.alert("Error", "Failed to load favorites. Try again later.");
+      setFavorites([]);
     } finally {
       setLoading(false);
     }
@@ -71,7 +95,7 @@ export default function FavoriteScreen() {
 
   const renderItem = ({ item }: { item: Movie }) => (
     <View
-      style={tw`bg-white w-[95%] mx-auto rounded-md flex-row items-center gap-4 p-4 mb-4`}
+      style={tw`bg-white w-[95%] mx-auto rounded-md flex-row items-center p-4 mb-4`}
     >
       {item.poster_path ? (
         <Image
@@ -83,7 +107,7 @@ export default function FavoriteScreen() {
       ) : (
         <View style={tw`w-16 h-24 bg-gray-300 rounded-md`} />
       )}
-      <View style={tw`flex-1`}>
+      <View style={tw`flex-1 ml-4`}>
         <Text style={tw`text-black text-lg font-bold`} numberOfLines={1}>
           {item.title}
         </Text>
@@ -99,6 +123,10 @@ export default function FavoriteScreen() {
       <Text style={tw`text-white text-2xl font-bold mb-4`}>Your Favorites</Text>
       {loading ? (
         <ActivityIndicator size="large" color="#C8A2C8" />
+      ) : !loggedIn ? (
+        <Text style={tw`text-white text-center`}>
+          Please login to see your favorites.
+        </Text>
       ) : favorites.length === 0 ? (
         <Text style={tw`text-white text-center`}>No favorites added yet.</Text>
       ) : (
@@ -107,6 +135,7 @@ export default function FavoriteScreen() {
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderItem}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={tw`pb-20`}
         />
       )}
     </View>
